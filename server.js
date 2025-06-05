@@ -15,12 +15,32 @@ app.use(
   })
 );
 
+// Database connection for serverless
+let isConnected = false;
+
+const connectToDatabase = async () => {
+  if (isConnected) return;
+
+  try {
+    await mongoose.connect(process.env.MONGO_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
+    isConnected = true;
+    console.log("Connected to MongoDB");
+  } catch (error) {
+    console.error("Database connection error:", error);
+    throw error;
+  }
+};
+
 app.get("/", (req, res) => {
   return res.status(200).json({ message: "Welcome", data: null });
 });
 
 app.get("/comments", async (req, res) => {
   try {
+    await connectToDatabase();
     const comments = await Comment.find().sort({ createdAt: 1 });
     return res
       .status(200)
@@ -32,6 +52,7 @@ app.get("/comments", async (req, res) => {
 
 app.post("/comments", async (req, res) => {
   try {
+    await connectToDatabase();
     const { content, author, parentId } = req.body;
     let level = 0;
 
@@ -68,6 +89,7 @@ app.post("/comments", async (req, res) => {
 
 app.patch("/comments/:id/vote", async (req, res) => {
   try {
+    await connectToDatabase();
     const { delta } = req.body;
     const comment = await Comment.findByIdAndUpdate(
       req.params.id,
@@ -84,6 +106,7 @@ app.patch("/comments/:id/vote", async (req, res) => {
 
 app.delete("/comments/:id", async (req, res) => {
   try {
+    await connectToDatabase();
     const comment = await Comment.findByIdAndUpdate(
       req.params.id,
       { isDeleted: true, content: "" },
@@ -97,14 +120,20 @@ app.delete("/comments/:id", async (req, res) => {
   }
 });
 
-mongoose
-  .connect(process.env.MONGO_URL)
-  .then(() => {
-    console.log("DB connected successfully");
-    app.listen(process.env.PORT || 8000, () => {
-      console.log("Server run on 8080");
-    });
-  })
-  .catch((e) => {
-    console.log("Error while connecting db", e);
+if (process.env.NODE_ENV !== "production") {
+  app.listen(process.env.PORT || 8000, () => {
+    console.log("Server run on 8080");
   });
+}
+
+// mongoose
+//   .connect(process.env.MONGO_URL)
+//   .then(() => {
+//     console.log("DB connected successfully");
+
+//   })
+//   .catch((e) => {
+//     console.log("Error while connecting db", e);
+//   });
+
+export default app;
